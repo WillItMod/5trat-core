@@ -1,0 +1,24 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    autoconf automake bash bsdextrautils build-essential ca-certificates \
+    libboost-all-dev libevent-dev libminiupnpc-dev libnatpmp-dev \
+    libsqlite3-dev libtool libzmq3-dev pkg-config python3 systemtap-sdt-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN ./autogen.sh \
+ && ./configure \
+    --without-gui \
+    --enable-tests \
+    --disable-bench \
+    --disable-fuzz-binary \
+    --disable-bdb \
+ && make -C src -j"$(nproc)" test/test_bitcoinII \
+ && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_nested_proof_tiers --log_level=test_suite \
+ && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_production_consensus_parameters --log_level=test_suite \
+ && src/test/test_bitcoinII --run_test=validation_tests/block_subsidy_test --log_level=test_suite \
+ && src/test/test_bitcoinII --run_test=validation_tests/subsidy_limit_test --log_level=test_suite

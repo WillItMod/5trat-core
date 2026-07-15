@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+datadir="${FIVETRAT_DATADIR:-/data}"
+network="${FIVETRAT_NETWORK:-regtest}"
+conf="${datadir}/fivetrat.conf"
+
+mkdir -p "${datadir}"
+
+# This file is generated from container environment on every start so an
+# explicitly approved external P2P address can be enabled without touching the
+# wallet or chain data volumes.
+umask 077
+rpc_user="${FIVETRAT_RPC_USER:-fivetrat}"
+rpc_password="${FIVETRAT_RPC_PASSWORD:?FIVETRAT_RPC_PASSWORD must be set}"
+p2p_port="${FIVETRAT_P2P_PORT:-57555}"
+rpc_port="${FIVETRAT_RPC_PORT:-57556}"
+zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
+
+  {
+    echo "server=1"
+    echo "listen=1"
+    echo "listenonion=0"
+    echo "dnsseed=0"
+    echo "discover=0"
+    echo "upnp=0"
+    echo "natpmp=0"
+    echo "txindex=1"
+    echo "fallbackfee=0.00001000"
+    if [[ -n "${FIVETRAT_EXTERNAL_IP:-}" ]]; then
+      echo "externalip=${FIVETRAT_EXTERNAL_IP}"
+    fi
+    echo "rpcuser=${rpc_user}"
+    echo "rpcpassword=${rpc_password}"
+    echo "rpcallowip=${FIVETRAT_RPC_ALLOW_IP:-172.16.0.0/12}"
+    echo "zmqpubhashblock=tcp://0.0.0.0:${zmq_hashblock_port}"
+    if [[ "${network}" == "regtest" ]]; then
+      echo "regtest=1"
+    elif [[ "${network}" == "testnet" ]]; then
+      echo "testnet=1"
+    fi
+    if [[ "${network}" == "regtest" ]]; then
+      echo "[regtest]"
+    elif [[ "${network}" == "testnet" ]]; then
+      echo "[test]"
+    else
+      echo "[main]"
+    fi
+    echo "rpcbind=0.0.0.0:${rpc_port}"
+    echo "rpcport=${rpc_port}"
+    echo "port=${p2p_port}"
+    IFS=',' read -ra peers <<< "${FIVETRAT_ADDNODES:-}"
+    for peer in "${peers[@]}"; do
+      [[ -n "${peer}" ]] && echo "addnode=${peer}"
+    done
+  } > "${conf}"
+
+exec fivetratd -datadir="${datadir}" -conf="${conf}" -printtoconsole=1 "$@"

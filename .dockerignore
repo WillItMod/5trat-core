@@ -1,0 +1,11 @@
+.git
+.github
+autom4te.cache
+build
+depends/built
+depends/work
+src/*.o
+src/**/*.o
+src/.deps
+src/**/.deps
+
