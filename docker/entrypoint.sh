@@ -49,9 +49,15 @@ zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
     echo "rpcbind=0.0.0.0:${rpc_port}"
     echo "rpcport=${rpc_port}"
     echo "port=${p2p_port}"
-    IFS=',' read -ra peers <<< "${FIVETRAT_ADDNODES:-}"
-    for peer in "${peers[@]}"; do
-      [[ -n "${peer}" ]] && echo "addnode=${peer}"
+    # Local replica links and public bootstrap links use the same validated P2P
+    # protocol.  Bootstrap nodes are discovery/availability aids only: every
+    # header, block and transaction they send is still verified locally.
+    for peer_list in "${FIVETRAT_ADDNODES:-}" "${FIVETRAT_BOOTSTRAP_NODES:-}"; do
+      IFS=',' read -ra peers <<< "${peer_list}"
+      for peer in "${peers[@]}"; do
+        peer="${peer//[[:space:]]/}"
+        [[ -n "${peer}" ]] && echo "addnode=${peer}"
+      done
     done
   } > "${conf}"
 
