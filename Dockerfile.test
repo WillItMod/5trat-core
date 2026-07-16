@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS test-build
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -17,8 +17,14 @@ RUN ./autogen.sh \
     --disable-bench \
     --disable-fuzz-binary \
     --disable-bdb \
- && make -C src -j"$(nproc)" test/test_bitcoinII \
- && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_nested_proof_tiers --log_level=test_suite \
+ && make -C src -j"$(nproc)" bitcoincashIId bitcoincashII-cli test/test_bitcoinII
+
+FROM test-build AS test-runner
+
+RUN src/test/test_bitcoinII --run_test=pow_tests/fivetrat_nested_proof_tiers --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_production_consensus_parameters --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=validation_tests/block_subsidy_test --log_level=test_suite \
- && src/test/test_bitcoinII --run_test=validation_tests/subsidy_limit_test --log_level=test_suite
+ && src/test/test_bitcoinII --run_test=validation_tests/subsidy_limit_test --log_level=test_suite \
+ && BITCOINIID=/src/src/bitcoincashIId \
+    BITCOINIICLI=/src/src/bitcoincashII-cli \
+    python3 test/functional/feature_bch2_consensus.py --configfile=/src/test/config.ini

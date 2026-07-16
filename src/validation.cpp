@@ -2749,14 +2749,19 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<MillisecondsDouble>(time_connect) / num_blocks_total);
 
     const CAmount base_subsidy{GetBlockSubsidy(pindex->nHeight, params.GetConsensus())};
+    const CAmount coinbase_value{block.vtx[0]->GetValueOut()};
 
-    if (block.vtx[0]->vout.empty() || block.vtx[0]->vout[0].nValue < base_subsidy) {
+    // The complete base subsidy must be issued, but miners may divide it among
+    // multiple coinbase outputs. This permits an operator-configured upkeep
+    // contribution without changing total issuance or granting the recipient
+    // any consensus privilege.
+    if (coinbase_value < base_subsidy) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
-                             "bad-cb-base", "Coinbase output zero must contain the 5TRAT base subsidy");
+                             "bad-cb-base", "Coinbase outputs must contain the complete 5TRAT base subsidy");
     }
     CAmount blockReward = nFees + base_subsidy;
-    if (block.vtx[0]->GetValueOut() > blockReward) {
-        LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", block.vtx[0]->GetValueOut(), blockReward);
+    if (coinbase_value > blockReward) {
+        LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", coinbase_value, blockReward);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount");
     }
 

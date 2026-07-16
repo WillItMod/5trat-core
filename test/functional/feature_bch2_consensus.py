@@ -53,17 +53,42 @@ class BCH2ConsensusTest(BitcoinTestFramework):
         height = best_block["height"] + 1
         block_time = best_block["time"] + 1
 
-        # Create block with coinbase that has TWO anyone-can-spend outputs
-        # This allows creating two INDEPENDENT transactions later
-        # At height 301 (regtest halving=150), subsidy is 12.5 BCH2
+        # Create a block with a 95%/5% coinbase split, matching 5tratSmack's
+        # optional upkeep contribution. Consensus must enforce total issuance,
+        # not require the full subsidy to be placed in output zero.
+        subsidy = node.getblocktemplate({})["coinbasevalue"]
+        upkeep = subsidy * 5 // 100
         coinbase = create_coinbase(height)
-        coinbase.vout[0].nValue = 6 * COIN
-        coinbase.vout.append(CTxOut(6 * COIN, CScript([OP_TRUE])))
+        coinbase.vout[0].nValue = subsidy - upkeep
+        coinbase.vout.append(CTxOut(upkeep, CScript([OP_TRUE])))
         coinbase.rehash()
 
         block1 = create_block(tip, coinbase, block_time)
         block1.solve()
         peer.send_blocks_and_test([block1], node, success=True)
+
+        self.log.info("Rejecting a split coinbase that underpays the base subsidy")
+        next_height = height + 1
+        next_subsidy = node.getblocktemplate({})["coinbasevalue"]
+        next_upkeep = next_subsidy * 5 // 100
+        underpaid = create_coinbase(next_height)
+        underpaid.vout[0].nValue = next_subsidy - next_upkeep - 1
+        underpaid.vout.append(CTxOut(next_upkeep, CScript([OP_TRUE])))
+        underpaid.rehash()
+        block_underpaid = create_block(int(block1.hash, 16), underpaid, block_time + 1)
+        block_underpaid.solve()
+        peer.send_blocks_and_test([block_underpaid], node, success=False,
+                                  reject_reason='bad-cb-base')
+
+        self.log.info("Rejecting a split coinbase that exceeds permitted issuance")
+        overpaid = create_coinbase(next_height)
+        overpaid.vout[0].nValue = next_subsidy - next_upkeep + 1
+        overpaid.vout.append(CTxOut(next_upkeep, CScript([OP_TRUE])))
+        overpaid.rehash()
+        block_overpaid = create_block(int(block1.hash, 16), overpaid, block_time + 2)
+        block_overpaid.solve()
+        peer.send_blocks_and_test([block_overpaid], node, success=False,
+                                  reject_reason='bad-cb-amount')
 
         # Mature the coinbase
         self.generatetoaddress(node, 100, node.get_deterministic_priv_key().address)
@@ -75,8 +100,10 @@ class BCH2ConsensusTest(BitcoinTestFramework):
 
         self.log.info("Test 1: Block with CTOR-ordered transactions accepted")
         # Create two INDEPENDENT transactions spending different coinbase outputs
-        tx_a = create_tx_with_script(block1.vtx[0], 0, script_sig=b'', amount=5 * COIN)
-        tx_b = create_tx_with_script(block1.vtx[0], 1, script_sig=b'', amount=5 * COIN)
+        tx_a = create_tx_with_script(
+            block1.vtx[0], 0, script_sig=b'', amount=block1.vtx[0].vout[0].nValue - 1000)
+        tx_b = create_tx_with_script(
+            block1.vtx[0], 1, script_sig=b'', amount=block1.vtx[0].vout[1].nValue - 1000)
         tx_a.calc_sha256()
         tx_b.calc_sha256()
 
@@ -94,11 +121,12 @@ class BCH2ConsensusTest(BitcoinTestFramework):
         block_time += 1
 
         self.log.info("Test 2: Block with out-of-order transactions rejected (CTOR enforcement)")
-        # Create a new spendable coinbase with two outputs
-        # Subsidy at this height (~402) is still 12.5 BCH2
+        # Create a new spendable coinbase with two outputs whose combined value
+        # is exactly the current base subsidy.
+        subsidy2 = node.getblocktemplate({})["coinbasevalue"]
         coinbase2 = create_coinbase(height)
-        coinbase2.vout[0].nValue = 6 * COIN
-        coinbase2.vout.append(CTxOut(6 * COIN, CScript([OP_TRUE])))
+        coinbase2.vout[0].nValue = subsidy2 // 2
+        coinbase2.vout.append(CTxOut(subsidy2 - coinbase2.vout[0].nValue, CScript([OP_TRUE])))
         coinbase2.rehash()
 
         block2 = create_block(tip, coinbase2, block_time)
