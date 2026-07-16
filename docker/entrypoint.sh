@@ -17,19 +17,27 @@ rpc_allow_ips="${FIVETRAT_RPC_ALLOW_IP:-127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.1
 p2p_port="${FIVETRAT_P2P_PORT:-57555}"
 rpc_port="${FIVETRAT_RPC_PORT:-57556}"
 zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
+advertise_file="${FIVETRAT_P2P_ADVERTISE_FILE:-/p2p-state/external-p2p}"
+external_ip="${FIVETRAT_EXTERNAL_IP:-}"
+if [[ -z "$external_ip" && -s "$advertise_file" ]]; then
+  external_ip="$(tr -d '\r\n[:space:]' <"$advertise_file")"
+fi
 
   {
     echo "server=1"
     echo "listen=1"
     echo "listenonion=0"
     echo "dnsseed=0"
-    echo "discover=0"
+    # Peer-observed discovery plus the host mapper's verified address feeds
+    # normal P2P self-announcement. The native container-level mapper stays off
+    # because it would target a Docker-only address.
+    echo "discover=1"
     echo "upnp=0"
     echo "natpmp=0"
     echo "txindex=1"
     echo "fallbackfee=0.00001000"
-    if [[ -n "${FIVETRAT_EXTERNAL_IP:-}" ]]; then
-      echo "externalip=${FIVETRAT_EXTERNAL_IP}"
+    if [[ -n "$external_ip" ]]; then
+      echo "externalip=${external_ip}"
     fi
     echo "rpcuser=${rpc_user}"
     echo "rpcpassword=${rpc_password}"
