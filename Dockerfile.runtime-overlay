@@ -1,0 +1,13 @@
+# Updates runtime-only node files without recompiling the consensus binary.
+#
+# This is intentionally used only when the operator has verified that the
+# existing base image contains the same Core source revision and the update is
+# limited to the container entrypoint/runtime configuration.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+COPY docker/entrypoint.sh /usr/local/bin/fivetrat-entrypoint
+
+USER root
+RUN chmod 0755 /usr/local/bin/fivetrat-entrypoint
+USER fivetrat

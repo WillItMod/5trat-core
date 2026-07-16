@@ -1,5 +1,10 @@
 FROM debian:bookworm-slim AS build
 
+# Small 5tratumOS appliances must not compile with every logical CPU while the
+# live stack is serving the UI and wallet. Callers can raise this explicitly on
+# a dedicated builder, but two jobs is a safe architecture-neutral default.
+ARG BUILD_JOBS=2
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     autoconf automake bash build-essential ca-certificates \
@@ -17,7 +22,7 @@ RUN ./autogen.sh \
     --disable-bench \
     --disable-fuzz-binary \
     --disable-bdb \
- && make -j"$(nproc)" \
+ && make -j"${BUILD_JOBS}" \
  && strip src/bitcoincashIId src/bitcoincashII-cli src/bitcoincashII-wallet
 
 FROM debian:bookworm-slim
