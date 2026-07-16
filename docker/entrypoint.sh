@@ -13,6 +13,7 @@ mkdir -p "${datadir}"
 umask 077
 rpc_user="${FIVETRAT_RPC_USER:-fivetrat}"
 rpc_password="${FIVETRAT_RPC_PASSWORD:?FIVETRAT_RPC_PASSWORD must be set}"
+rpc_allow_ips="${FIVETRAT_RPC_ALLOW_IP:-127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}"
 p2p_port="${FIVETRAT_P2P_PORT:-57555}"
 rpc_port="${FIVETRAT_RPC_PORT:-57556}"
 zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
@@ -32,7 +33,11 @@ zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
     fi
     echo "rpcuser=${rpc_user}"
     echo "rpcpassword=${rpc_password}"
-    echo "rpcallowip=${FIVETRAT_RPC_ALLOW_IP:-172.16.0.0/12}"
+    IFS=',' read -ra rpc_allow_entries <<< "${rpc_allow_ips}"
+    for rpc_allow_entry in "${rpc_allow_entries[@]}"; do
+      rpc_allow_entry="${rpc_allow_entry//[[:space:]]/}"
+      [[ -n "${rpc_allow_entry}" ]] && echo "rpcallowip=${rpc_allow_entry}"
+    done
     echo "zmqpubhashblock=tcp://0.0.0.0:${zmq_hashblock_port}"
     if [[ "${network}" == "regtest" ]]; then
       echo "regtest=1"
@@ -53,6 +58,7 @@ zmq_hashblock_port="${FIVETRAT_ZMQ_HASHBLOCK_PORT:-28342}"
     # protocol.  Bootstrap nodes are discovery/availability aids only: every
     # header, block and transaction they send is still verified locally.
     for peer_list in "${FIVETRAT_ADDNODES:-}" "${FIVETRAT_BOOTSTRAP_NODES:-}"; do
+      [[ -z "${peer_list//[[:space:]]/}" ]] && continue
       IFS=',' read -ra peers <<< "${peer_list}"
       for peer in "${peers[@]}"; do
         peer="${peer//[[:space:]]/}"
