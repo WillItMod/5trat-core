@@ -15,6 +15,7 @@
 #include <primitives/block.h>
 #include <uint256.h>
 
+#include <algorithm>
 #include <cstdint>
 
 ProofTier ClassifyProofTier(const uint256& hash, unsigned int nBits) noexcept
@@ -181,8 +182,8 @@ arith_uint256 CalculateASERT(const arith_uint256 &refTarget,
 }
 
 // ASERT's half-life is selected by Consensus::Params::nASERTHalfLife.
-// 5TRAT mainnet and testnet hold it at 30 minutes so a small SHA-256 network
-// responds promptly to abrupt hashrate changes.
+// 5TRAT mainnet holds it at 30 minutes so a small SHA-256 network responds
+// promptly to abrupt hashrate changes.
 
 /**
  * Calculate the next work required for a new block.
@@ -197,16 +198,58 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Skip ASERT for chains with no retargeting (regtest) - they keep constant difficulty
     int nNextHeight = pindexLast->nHeight + 1;
     if (params.IsBCH2ForkActive(nNextHeight) && params.asertAnchorParams && !params.fPowNoRetargeting) {
-        // Get ASERT anchor parameters
-        const int anchorHeight = params.asertAnchorParams->nHeight;
-        const uint32_t anchorBits = params.asertAnchorParams->nBits;
+        // Get the compiled ASERT anchor parameters. Production periodically
+        // re-anchors to a block already accepted by consensus so this lookup
+        // remains bounded as the chain grows.
+        int anchorHeight = params.asertAnchorParams->nHeight;
+        uint32_t anchorBits = params.asertAnchorParams->nBits;
         int64_t anchorParentTime = params.asertAnchorParams->nPrevBlockTime;
+
+        if (params.nASERTAnchorEpochLength > 0 && pindexLast->nHeight >= anchorHeight) {
+            const int epochStartHeight = anchorHeight +
+                ((pindexLast->nHeight - anchorHeight) / params.nASERTAnchorEpochLength) *
+                    params.nASERTAnchorEpochLength;
+            const CBlockIndex* epochAnchor = pindexLast->GetAncestor(epochStartHeight);
+            if (!epochAnchor) {
+                LogPrintf("5TRAT CRITICAL: ASERT epoch anchor not found at height %d\n", epochStartHeight);
+                return nProofOfWorkLimit;
+            }
+
+            anchorHeight = epochStartHeight;
+            anchorBits = epochAnchor->nBits;
+            anchorParentTime = epochAnchor->GetBlockTime() - params.nPowTargetSpacing;
+
+            // A long outage must never make the first returning block easier:
+            // that block was already accepted at the old target. For following
+            // blocks, cap recovery to a small deterministic number of ASERT
+            // half-lives instead of counting the entire idle wall-clock gap.
+            if (params.nASERTStallResetSeconds > 0 &&
+                params.nASERTMaxStallEasingHalflives > 0) {
+                const CBlockIndex* cursor = pindexLast;
+                while (cursor && cursor->nHeight >= epochStartHeight) {
+                    if (cursor->pprev) {
+                        const int64_t gap = cursor->GetBlockTime() - cursor->pprev->GetBlockTime();
+                        if (gap > params.nASERTStallResetSeconds) {
+                            const int64_t maxEffectiveGap = params.nPowTargetSpacing +
+                                params.nASERTMaxStallEasingHalflives *
+                                    params.GetASERTHalfLife(cursor->nHeight + 1);
+                            anchorHeight = cursor->nHeight;
+                            anchorBits = cursor->nBits;
+                            anchorParentTime = cursor->GetBlockTime() -
+                                std::min(gap, maxEffectiveGap);
+                            break;
+                        }
+                    }
+                    cursor = cursor->pprev;
+                }
+            }
+        }
 
         // 5TRAT fixes the proof target for block one, but starts the ASERT clock
         // when that block is actually accepted. Deployment-to-first-miner idle
         // time therefore cannot create a low-difficulty catch-up burst.
-        if (params.fASERTAnchorAtFirstBlockTime &&
-            anchorHeight == 1 && pindexLast->nHeight >= anchorHeight) {
+        if (params.fASERTAnchorAtFirstBlockTime && anchorHeight == 1 &&
+            pindexLast->nHeight >= anchorHeight) {
             const CBlockIndex* pAnchor = pindexLast->GetAncestor(anchorHeight);
             if (!pAnchor) {
                 LogPrintf("5TRAT CRITICAL: launch anchor block not found at height %d\n", anchorHeight);

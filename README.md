@@ -14,18 +14,22 @@ release, exchange listing, 5tratumOS DEV-feed package, or App Store package.
 | --- | --- |
 | Currency / address prefix | 5TRAT / `5trat:` |
 | Proof of work | SHA-256d |
-| Accepted-block target | 5 minutes |
+| Accepted-block target | 15 minutes |
 | Difficulty adjustment | Per-block ASERT, 30-minute half-life |
-| Launch anchor | Difficulty 6,984,955.44; about 5 minutes at 100 TH/s |
-| Minimum difficulty | 698,495.54; 10 TH/s-equivalent floor |
+| Launch anchor | Difficulty 20,955,132.57; about 15 minutes at 100 TH/s |
+| Minimum difficulty | 20,955,132.57; permanent 100 TH/s-equivalent floor |
 | Block subsidy | 5 5TRAT, halving every 420,000 blocks |
 | Supply limit | Approximately 4.2 million 5TRAT plus fees |
 | P2P / RPC | TCP 57555 / TCP 57576 |
-| Genesis | `854a0ac6bcd46212f4a346a7c5f214c62490b7d970d0f2edc5889086ee38c174` |
+| Genesis | `af4973599946fbe8c350eae4ff51ba9fbe3fc00fa07e8413b869874ee1be8310` |
 
 Block one always uses the compiled launch target. From block two onward, the
 ASERT clock is relative to block one's accepted timestamp, so time spent waiting
 for the first miner cannot create a low-difficulty catch-up burst.
+Every 144 blocks the node starts a new deterministic ASERT anchor. An accepted
+gap over six hours may ease the following target by at most two half-lives
+(approximately 4x), while the first returning block still has to satisfy the
+target already in force and no target may cross the permanent launch floor.
 
 Blue, Pink, and Gold are nested proof-quality labels at `T`, `T/4`, and `T/12`.
 They all validate against the same chain target and all accepted blocks receive

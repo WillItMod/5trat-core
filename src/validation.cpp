@@ -1819,8 +1819,8 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
         return 0;
 
     CAmount nSubsidy = consensusParams.nInitialSubsidy;
-    // Production uses five-minute blocks and a 420,000-block interval,
-    // approximately four years. Test fixtures may select other parameters.
+    // Production uses 15-minute blocks and a 420,000-block interval,
+    // approximately 12 years. Test fixtures may select other parameters.
     nSubsidy >>= halvings;
     return nSubsidy;
 }

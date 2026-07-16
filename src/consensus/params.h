@@ -231,6 +231,20 @@ struct Params {
     /** ASERT half-life in seconds. Production 5TRAT fixes this at 30 minutes. */
     int64_t nASERTHalfLife{ASERT_HALFLIFE_2_DAYS};
 
+    /**
+     * Bound the amount of history used by the production ASERT anchor. A
+     * positive value starts a fresh deterministic anchor at this interval.
+     */
+    int nASERTAnchorEpochLength{0};
+
+    /**
+     * Treat a larger accepted inter-block gap as a network stall. The stalled
+     * block must still satisfy the difficulty already in force; only the next
+     * target may recover, by at most nASERTMaxStallEasingHalflives.
+     */
+    int64_t nASERTStallResetSeconds{0};
+    int nASERTMaxStallEasingHalflives{0};
+
     /** Optional test-chain transition; NEVER_ACTIVE_HEIGHT keeps one half-life. */
     int nASERTHalfLifeTransitionHeight{NEVER_ACTIVE_HEIGHT};
 

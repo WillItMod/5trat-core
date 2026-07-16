@@ -68,6 +68,13 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
+static CBlock Create5tratGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+{
+    const char* pszTimestamp = "16 July 2026 - 5tratum Coin 15-minute relaunch: no catch-up issuance";
+    const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
+    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
+}
+
 /**
  * Main network on which people trade goods and services.
  */
@@ -109,13 +116,13 @@ public:
         consensus.upgrade10Height = 0;
         consensus.upgrade11Height = 0;
 
-        // Production prototype anchor: accepted Blue proofs average five minutes
+        // Production prototype anchor: accepted Blue proofs average 15 minutes
         // at 100 TH/s. Pink and Gold are nested proof-quality achievements and
         // never alter subsidy or chainwork.
         consensus.asertAnchorParams = Consensus::ASERTAnchor{
             1,
-            0x1a0266e1,
-            1784116800,
+            0x1a00ccf5,
+            1784228400,
         };
         consensus.fASERTAnchorAtFirstBlockTime = true;
 
@@ -123,6 +130,9 @@ public:
         // response fixed at 30 minutes; do not slow to a two-day half-life.
         consensus.nASERTHalfLife = Consensus::Params::ASERT_HALFLIFE_30_MINUTES;
         consensus.nASERTHalfLifeTransitionHeight = Consensus::NEVER_ACTIVE_HEIGHT;
+        consensus.nASERTAnchorEpochLength = 144;
+        consensus.nASERTStallResetSeconds = 6 * 60 * 60;
+        consensus.nASERTMaxStallEasingHalflives = 2;
 
         // Default block size (32MB for BCH)
         consensus.nDefaultConsensusBlockSize = 32000000;
@@ -150,11 +160,12 @@ public:
         consensus.MinBIP9WarningHeight = 0;
 
         // Mining/difficulty rules
-        // A permanent 10 TH/s-equivalent floor prevents long idle periods from
-        // turning the chain into a near-zero-difficulty issuance burst.
-        consensus.powLimit = uint256S("0000000000001804ca0000000000000000000000000000000000000000000000");
+        // The permanent floor is the 100 TH/s launch target. Idle wall-clock
+        // time can never make the chain easier than this or create catch-up
+        // issuance after an outage.
+        consensus.powLimit = uint256S("00000000000000ccf50000000000000000000000000000000000000000000000");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
-        consensus.nPowTargetSpacing = 5 * 60;
+        consensus.nPowTargetSpacing = 15 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
 
@@ -166,10 +177,10 @@ public:
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
          * a large 32-bit integer with any alignment.
          */
-        pchMessageStart[0] = 0xab;
-        pchMessageStart[1] = 0x62;
-        pchMessageStart[2] = 0xdd;
-        pchMessageStart[3] = 0x53;
+        pchMessageStart[0] = 0x94;
+        pchMessageStart[1] = 0x40;
+        pchMessageStart[2] = 0x0d;
+        pchMessageStart[3] = 0xb0;
         nDefaultPort = 57555;
         nPruneAfterHeight = 100000;
         m_assumed_blockchain_size = 0;
@@ -178,10 +189,10 @@ public:
         // The compiled bootstrap header declares the same target as block one,
         // so difficulty telemetry is meaningful from the first node start. Its
         // exact hash is admitted by the genesis-only exception in pow.cpp.
-        genesis = CreateGenesisBlock(1784116800, 0, 0x1a0266e1, 1, 50 * COIN);
+        genesis = Create5tratGenesisBlock(1784228400, 0, 0x1a00ccf5, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("0x854a0ac6bcd46212f4a346a7c5f214c62490b7d970d0f2edc5889086ee38c174"));
-        assert(genesis.hashMerkleRoot == uint256S("0xe8c58936a0ad31eaea782ef0401f185bf466d71c0384c5b2ccfd0bd5a17e3377"));
+        assert(consensus.hashGenesisBlock == uint256S("0xaf4973599946fbe8c350eae4ff51ba9fbe3fc00fa07e8413b869874ee1be8310"));
+        assert(genesis.hashMerkleRoot == uint256S("0xf18430f89ae896d596d5dba54f5303ddff124532015bdb07150ba3f9f4763335"));
 
         // Note that of those which support the service bits prefix, most only support a subset of
         // possible options.

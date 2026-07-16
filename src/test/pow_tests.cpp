@@ -13,6 +13,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <vector>
+
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
 
 /* Test calculation of next difficulty target with no constraints applying */
@@ -444,7 +446,7 @@ BOOST_AUTO_TEST_CASE(asert_symmetric_adjustment)
 
 BOOST_AUTO_TEST_CASE(fivetrat_nested_proof_tiers)
 {
-    constexpr uint32_t blue_bits{0x1a0266e1};
+    constexpr uint32_t blue_bits{0x1a00ccf5};
     arith_uint256 blue_target;
     blue_target.SetCompact(blue_bits);
 
@@ -463,9 +465,12 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
     const auto& consensus = params->GetConsensus();
 
     BOOST_CHECK_EQUAL(params->GetDefaultPort(), 57555);
-    BOOST_CHECK_EQUAL(consensus.nPowTargetSpacing, 5 * 60);
+    BOOST_CHECK_EQUAL(consensus.nPowTargetSpacing, 15 * 60);
     BOOST_CHECK_EQUAL(consensus.nASERTHalfLife, Consensus::Params::ASERT_HALFLIFE_30_MINUTES);
     BOOST_CHECK_EQUAL(consensus.nASERTHalfLifeTransitionHeight, Consensus::NEVER_ACTIVE_HEIGHT);
+    BOOST_CHECK_EQUAL(consensus.nASERTAnchorEpochLength, 144);
+    BOOST_CHECK_EQUAL(consensus.nASERTStallResetSeconds, 6 * 60 * 60);
+    BOOST_CHECK_EQUAL(consensus.nASERTMaxStallEasingHalflives, 2);
     BOOST_CHECK(consensus.fASERTAnchorAtFirstBlockTime);
     BOOST_CHECK_EQUAL(consensus.nSubsidyHalvingInterval, 420000);
     BOOST_CHECK_EQUAL(consensus.nInitialSubsidy, 5 * COIN);
@@ -473,8 +478,10 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
     BOOST_CHECK_EQUAL(GetBlockSubsidy(420000, consensus), 250000000);
     BOOST_REQUIRE(consensus.asertAnchorParams.has_value());
     BOOST_CHECK_EQUAL(consensus.asertAnchorParams->nHeight, 1);
-    BOOST_CHECK_EQUAL(consensus.asertAnchorParams->nBits, 0x1a0266e1U);
-    BOOST_CHECK_EQUAL(UintToArith256(consensus.powLimit).GetCompact(), 0x1a1804caU);
+    BOOST_CHECK_EQUAL(consensus.asertAnchorParams->nBits, 0x1a00ccf5U);
+    BOOST_CHECK_EQUAL(UintToArith256(consensus.powLimit).GetCompact(), 0x1a00ccf5U);
+    BOOST_CHECK_EQUAL(params->GenesisBlock().GetHash().GetHex(), "af4973599946fbe8c350eae4ff51ba9fbe3fc00fa07e8413b869874ee1be8310");
+    BOOST_CHECK_EQUAL(params->GenesisBlock().hashMerkleRoot.GetHex(), "f18430f89ae896d596d5dba54f5303ddff124532015bdb07150ba3f9f4763335");
     BOOST_CHECK(CheckProofOfWork(params->GenesisBlock().GetHash(), params->GenesisBlock().nBits, consensus));
 
     CBlockIndex genesis;
@@ -490,7 +497,92 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
 
     CBlockHeader block_two;
     block_two.nTime = delayed_block_one.nTime + consensus.nPowTargetSpacing;
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&delayed_block_one, &block_two, consensus), 0x1a0266e1U);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&delayed_block_one, &block_two, consensus), 0x1a00ccf5U);
+}
+
+BOOST_AUTO_TEST_CASE(fivetrat_stall_recovery_is_bounded)
+{
+    const auto params = CreateChainParams(ArgsManager{}, ChainType::MAIN);
+    const auto& consensus = params->GetConsensus();
+
+    std::vector<CBlockIndex> chain(12);
+    chain[0].nHeight = 0;
+    chain[0].nTime = params->GenesisBlock().nTime;
+    chain[0].nBits = params->GenesisBlock().nBits;
+    chain[1].pprev = &chain[0];
+    chain[1].nHeight = 1;
+    chain[1].nTime = chain[0].nTime + consensus.nPowTargetSpacing;
+    chain[1].nBits = consensus.asertAnchorParams->nBits;
+
+    // Establish a legitimately high target using a run of rapid blocks.
+    for (int height = 2; height <= 9; ++height) {
+        CBlockHeader candidate;
+        candidate.nTime = chain[height - 1].nTime + 1;
+        chain[height].pprev = &chain[height - 1];
+        chain[height].nHeight = height;
+        chain[height].nTime = candidate.nTime;
+        chain[height].nBits = GetNextWorkRequired(&chain[height - 1], &candidate, consensus);
+    }
+
+    // The first block after an outage is still required at the difficulty
+    // already in force; a candidate timestamp cannot buy an easier target.
+    CBlockHeader returning_block;
+    returning_block.nTime = chain[9].nTime + 7 * 60 * 60;
+    CBlockHeader ordinary_candidate;
+    ordinary_candidate.nTime = chain[9].nTime + consensus.nPowTargetSpacing;
+    const uint32_t returning_bits = GetNextWorkRequired(&chain[9], &returning_block, consensus);
+    BOOST_CHECK_EQUAL(
+        returning_bits,
+        GetNextWorkRequired(&chain[9], &ordinary_candidate, consensus));
+
+    chain[10].pprev = &chain[9];
+    chain[10].nHeight = 10;
+    chain[10].nTime = returning_block.nTime;
+    chain[10].nBits = returning_bits;
+
+    CBlockHeader following_block;
+    following_block.nTime = chain[10].nTime + consensus.nPowTargetSpacing;
+    arith_uint256 recovered_target;
+    recovered_target.SetCompact(
+        GetNextWorkRequired(&chain[10], &following_block, consensus));
+    arith_uint256 high_difficulty_target;
+    high_difficulty_target.SetCompact(returning_bits);
+
+    // Two configured half-lives permit approximately 4x easing, never an
+    // unbounded catch-up target and never beyond the permanent launch floor.
+    BOOST_CHECK(recovered_target >= high_difficulty_target * 3);
+    BOOST_CHECK(recovered_target <= high_difficulty_target * 5);
+    BOOST_CHECK(recovered_target <= UintToArith256(consensus.powLimit));
+}
+
+BOOST_AUTO_TEST_CASE(fivetrat_fast_blocks_raise_difficulty_quickly)
+{
+    const auto params = CreateChainParams(ArgsManager{}, ChainType::MAIN);
+    const auto& consensus = params->GetConsensus();
+
+    std::vector<CBlockIndex> chain(14);
+    chain[0].nHeight = 0;
+    chain[0].nTime = params->GenesisBlock().nTime;
+    chain[0].nBits = params->GenesisBlock().nBits;
+    chain[1].pprev = &chain[0];
+    chain[1].nHeight = 1;
+    chain[1].nTime = chain[0].nTime + consensus.nPowTargetSpacing;
+    chain[1].nBits = consensus.asertAnchorParams->nBits;
+
+    for (int height = 2; height < 14; ++height) {
+        CBlockHeader candidate;
+        candidate.nTime = chain[height - 1].nTime + 1;
+        chain[height].pprev = &chain[height - 1];
+        chain[height].nHeight = height;
+        chain[height].nTime = candidate.nTime;
+        chain[height].nBits = GetNextWorkRequired(&chain[height - 1], &candidate, consensus);
+    }
+
+    arith_uint256 launch_target;
+    launch_target.SetCompact(consensus.asertAnchorParams->nBits);
+    arith_uint256 final_target;
+    final_target.SetCompact(chain.back().nBits);
+    BOOST_CHECK(final_target < launch_target / 32);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
