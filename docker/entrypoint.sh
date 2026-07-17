@@ -25,7 +25,7 @@ fi
 
   {
     echo "server=1"
-    echo "uacomment=5min-v040"
+    echo "uacomment=5min-v041-h80"
     echo "listen=1"
     echo "listenonion=0"
     echo "dnsseed=0"

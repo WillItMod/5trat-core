@@ -466,12 +466,12 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
 
     BOOST_CHECK_EQUAL(params->GetDefaultPort(), 57555);
     BOOST_CHECK_EQUAL(consensus.nPowTargetSpacing, 15 * 60);
-    BOOST_CHECK_EQUAL(consensus.nPowTargetUpgradeHeight, 500);
-    BOOST_CHECK_EQUAL(consensus.GetPowTargetSpacing(499), 15 * 60);
-    BOOST_CHECK_EQUAL(consensus.GetPowTargetSpacing(500), 5 * 60);
+    BOOST_CHECK_EQUAL(consensus.nPowTargetUpgradeHeight, 80);
+    BOOST_CHECK_EQUAL(consensus.GetPowTargetSpacing(79), 15 * 60);
+    BOOST_CHECK_EQUAL(consensus.GetPowTargetSpacing(80), 5 * 60);
     BOOST_CHECK_EQUAL(consensus.nASERTHalfLife, Consensus::Params::ASERT_HALFLIFE_30_MINUTES);
-    BOOST_CHECK_EQUAL(consensus.GetASERTHalfLife(499), 30 * 60);
-    BOOST_CHECK_EQUAL(consensus.GetASERTHalfLife(500), 15 * 60);
+    BOOST_CHECK_EQUAL(consensus.GetASERTHalfLife(79), 30 * 60);
+    BOOST_CHECK_EQUAL(consensus.GetASERTHalfLife(80), 15 * 60);
     BOOST_CHECK_EQUAL(consensus.nASERTHalfLifeTransitionHeight, Consensus::NEVER_ACTIVE_HEIGHT);
     BOOST_CHECK_EQUAL(consensus.nASERTAnchorEpochLength, 144);
     BOOST_CHECK_EQUAL(consensus.nASERTStallResetSeconds, 6 * 60 * 60);
@@ -484,8 +484,8 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
     BOOST_REQUIRE(consensus.asertAnchorParams.has_value());
     BOOST_CHECK_EQUAL(consensus.asertAnchorParams->nHeight, 1);
     BOOST_CHECK_EQUAL(consensus.asertAnchorParams->nBits, 0x1a00ccf5U);
-    BOOST_CHECK_EQUAL(UintToArith256(consensus.GetPowLimit(499)).GetCompact(), 0x1a00ccf5U);
-    BOOST_CHECK_EQUAL(UintToArith256(consensus.GetPowLimit(500)).GetCompact(), 0x1a0266dfU);
+    BOOST_CHECK_EQUAL(UintToArith256(consensus.GetPowLimit(79)).GetCompact(), 0x1a00ccf5U);
+    BOOST_CHECK_EQUAL(UintToArith256(consensus.GetPowLimit(80)).GetCompact(), 0x1a0266dfU);
     BOOST_CHECK_EQUAL(params->GenesisBlock().GetHash().GetHex(), "af4973599946fbe8c350eae4ff51ba9fbe3fc00fa07e8413b869874ee1be8310");
     BOOST_CHECK_EQUAL(params->GenesisBlock().hashMerkleRoot.GetHex(), "f18430f89ae896d596d5dba54f5303ddff124532015bdb07150ba3f9f4763335");
     BOOST_CHECK(CheckProofOfWork(params->GenesisBlock().GetHash(), params->GenesisBlock().nBits, consensus));
@@ -547,9 +547,10 @@ BOOST_AUTO_TEST_CASE(fivetrat_five_minute_upgrade_boundary)
     BOOST_CHECK_EQUAL(GetBlockSubsidy(activation, consensus), 5 * COIN);
     BOOST_CHECK_EQUAL(GetBlockSubsidy(420000, consensus), 250000000);
 
-    // Even if block 499 is the first returning block after an outage, block
-    // 500 is an exact target handoff. Bounded stall recovery may begin with
-    // later blocks, never by creating an activation cliff.
+    // Even if the final legacy block is the first returning block after an
+    // outage, the activation block is an exact target handoff. Bounded stall
+    // recovery may begin with later blocks, never by creating an activation
+    // cliff.
     chain[activation - 1].nTime += 7 * 60 * 60;
     CBlockHeader delayed_activation;
     delayed_activation.nTime = chain[activation - 1].nTime +

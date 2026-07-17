@@ -161,12 +161,12 @@ public:
 
         consensus.MinBIP9WarningHeight = 0;
 
-        // Mining/difficulty rules. Blocks 1-499 retain the 15-minute launch
-        // schedule and its 100 TH/s floor. Block 500 activates a five-minute
+        // Mining/difficulty rules. Blocks 1-79 retain the 15-minute launch
+        // schedule and its 100 TH/s floor. Block 80 activates a five-minute
         // schedule with the same 100 TH/s calibration (3x target / one-third
-        // difficulty), preserving all history and the inherited block-499
+        // difficulty), preserving all history and the inherited block-79
         // target at the boundary.
-        consensus.nPowTargetUpgradeHeight = 500;
+        consensus.nPowTargetUpgradeHeight = 80;
         consensus.powLimitBeforeUpgrade =
             uint256S("00000000000000ccf50000000000000000000000000000000000000000000000");
         consensus.powLimit =

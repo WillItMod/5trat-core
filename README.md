@@ -14,10 +14,10 @@ release, exchange listing, 5tratumOS DEV-feed package, or App Store package.
 | --- | --- |
 | Currency / address prefix | 5TRAT / `5trat:` |
 | Proof of work | SHA-256d |
-| Accepted-block target | 15 minutes through height 499; 5 minutes from height 500 |
-| Difficulty adjustment | Per-block ASERT; 30-minute half-life through height 499, 15 minutes from height 500 |
-| Launch anchor | Difficulty 20,955,132.57; about 15 minutes at 100 TH/s through height 499 |
-| Minimum difficulty | 20,955,132.57 through height 499; about 6,985,044.19 from height 500 (100 TH/s-equivalent floor at each schedule) |
+| Accepted-block target | 15 minutes through height 79; 5 minutes from height 80 |
+| Difficulty adjustment | Per-block ASERT; 30-minute half-life through height 79, 15 minutes from height 80 |
+| Launch anchor | Difficulty 20,955,132.57; about 15 minutes at 100 TH/s through height 79 |
+| Minimum difficulty | 20,955,132.57 through height 79; about 6,985,044.19 from height 80 (100 TH/s-equivalent floor at each schedule) |
 | Block subsidy | 5 5TRAT, halving every 420,000 blocks |
 | Supply limit | Approximately 4.2 million 5TRAT plus fees |
 | P2P / RPC | TCP 57555 / TCP 57576 |
