@@ -1819,8 +1819,9 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
         return 0;
 
     CAmount nSubsidy = consensusParams.nInitialSubsidy;
-    // Production uses 15-minute blocks and a 420,000-block interval,
-    // approximately 12 years. Test fixtures may select other parameters.
+    // Production keeps a height-based 420,000-block interval. The five-minute
+    // schedule therefore reaches the first halving roughly four years after
+    // activation without changing the reward or any historical balance.
     nSubsidy >>= halvings;
     return nSubsidy;
 }
@@ -4796,7 +4797,9 @@ bool ChainstateManager::ProcessNewBlockHeaders(const std::vector<CBlockHeader>& 
     if (NotifyHeaderTip(*this)) {
         if (IsInitialBlockDownload() && ppindex && *ppindex) {
             const CBlockIndex& last_accepted{**ppindex};
-            const int64_t blocks_left{(GetTime() - last_accepted.GetBlockTime()) / GetConsensus().nPowTargetSpacing};
+            const int64_t blocks_left{
+                (GetTime() - last_accepted.GetBlockTime()) /
+                GetConsensus().GetPowTargetSpacing(last_accepted.nHeight + 1)};
             const double progress{100.0 * last_accepted.nHeight / (last_accepted.nHeight + blocks_left)};
             LogPrintf("Synchronizing blockheaders, height: %d (~%.2f%%)\n", last_accepted.nHeight, progress);
         }
@@ -4822,7 +4825,9 @@ void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t 
     bool initial_download = IsInitialBlockDownload();
     GetNotifications().headerTip(GetSynchronizationState(initial_download), height, timestamp, /*presync=*/true);
     if (initial_download) {
-        const int64_t blocks_left{(GetTime() - timestamp) / GetConsensus().nPowTargetSpacing};
+        const int64_t blocks_left{
+            (GetTime() - timestamp) /
+            GetConsensus().GetPowTargetSpacing(static_cast<int>(height) + 1)};
         const double progress{100.0 * height / (height + blocks_left)};
         LogPrintf("Pre-synchronizing blockheaders, height: %d (~%.2f%%)\n", height, progress);
     }

@@ -25,6 +25,7 @@ FROM test-build AS test-runner
 
 RUN src/test/test_bitcoinII --run_test=pow_tests/fivetrat_nested_proof_tiers --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_production_consensus_parameters --log_level=test_suite \
+ && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_five_minute_upgrade_boundary --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_stall_recovery_is_bounded --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_fast_blocks_raise_difficulty_quickly --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=validation_tests/block_subsidy_test --log_level=test_suite \

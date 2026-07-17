@@ -126,8 +126,10 @@ public:
         };
         consensus.fASERTAnchorAtFirstBlockTime = true;
 
-        // A small SHA-256 network must react much faster than BCH. Keep the
-        // response fixed at 30 minutes; do not slow to a two-day half-life.
+        // A small SHA-256 network must react much faster than BCH. The launch
+        // schedule uses a 30-minute half-life; the five-minute schedule moves
+        // to 15 minutes so sudden rental/farm hash is priced in within a few
+        // blocks.
         consensus.nASERTHalfLife = Consensus::Params::ASERT_HALFLIFE_30_MINUTES;
         consensus.nASERTHalfLifeTransitionHeight = Consensus::NEVER_ACTIVE_HEIGHT;
         consensus.nASERTAnchorEpochLength = 144;
@@ -159,13 +161,20 @@ public:
 
         consensus.MinBIP9WarningHeight = 0;
 
-        // Mining/difficulty rules
-        // The permanent floor is the 100 TH/s launch target. Idle wall-clock
-        // time can never make the chain easier than this or create catch-up
-        // issuance after an outage.
-        consensus.powLimit = uint256S("00000000000000ccf50000000000000000000000000000000000000000000000");
+        // Mining/difficulty rules. Blocks 1-499 retain the 15-minute launch
+        // schedule and its 100 TH/s floor. Block 500 activates a five-minute
+        // schedule with the same 100 TH/s calibration (3x target / one-third
+        // difficulty), preserving all history and the inherited block-499
+        // target at the boundary.
+        consensus.nPowTargetUpgradeHeight = 500;
+        consensus.powLimitBeforeUpgrade =
+            uint256S("00000000000000ccf50000000000000000000000000000000000000000000000");
+        consensus.powLimit =
+            uint256S("0000000000000266df0000000000000000000000000000000000000000000000");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
         consensus.nPowTargetSpacing = 15 * 60;
+        consensus.nPowTargetSpacingAfterUpgrade = 5 * 60;
+        consensus.nASERTHalfLifeAfterUpgrade = 15 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
 

@@ -181,9 +181,9 @@ arith_uint256 CalculateASERT(const arith_uint256 &refTarget,
     return nextTarget;
 }
 
-// ASERT's half-life is selected by Consensus::Params::nASERTHalfLife.
-// 5TRAT mainnet holds it at 30 minutes so a small SHA-256 network responds
-// promptly to abrupt hashrate changes.
+// ASERT's half-life is selected by Consensus::Params::GetASERTHalfLife().
+// 5TRAT mainnet uses 30 minutes on the launch schedule and 15 minutes after
+// the five-minute target-spacing upgrade.
 
 /**
  * Calculate the next work required for a new block.
@@ -192,11 +192,13 @@ arith_uint256 CalculateASERT(const arith_uint256 &refTarget,
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     assert(pindexLast != nullptr);
-    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
     // Check against the height being mined (pindexLast->nHeight + 1), not the parent
     // Skip ASERT for chains with no retargeting (regtest) - they keep constant difficulty
     int nNextHeight = pindexLast->nHeight + 1;
+    const int64_t nPowTargetSpacing = params.GetPowTargetSpacing(nNextHeight);
+    const arith_uint256 powLimit = UintToArith256(params.GetPowLimit(nNextHeight));
+    const unsigned int nProofOfWorkLimit = powLimit.GetCompact();
     if (params.IsBCH2ForkActive(nNextHeight) && params.asertAnchorParams && !params.fPowNoRetargeting) {
         // Get the compiled ASERT anchor parameters. Production periodically
         // re-anchors to a block already accepted by consensus so this lookup
@@ -204,6 +206,21 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         int anchorHeight = params.asertAnchorParams->nHeight;
         uint32_t anchorBits = params.asertAnchorParams->nBits;
         int64_t anchorParentTime = params.asertAnchorParams->nPrevBlockTime;
+
+        // A spacing/floor upgrade starts a fresh ASERT schedule from the last
+        // block accepted under the old rules. This makes the activation block
+        // inherit its parent's target exactly while all following blocks use
+        // the new schedule.
+        if (params.IsPowTargetUpgradeActive(nNextHeight)) {
+            anchorHeight = params.nPowTargetUpgradeHeight - 1;
+            const CBlockIndex* upgradeAnchor = pindexLast->GetAncestor(anchorHeight);
+            if (!upgradeAnchor) {
+                LogPrintf("5TRAT CRITICAL: PoW upgrade anchor not found at height %d\n", anchorHeight);
+                return nProofOfWorkLimit;
+            }
+            anchorBits = upgradeAnchor->nBits;
+            anchorParentTime = upgradeAnchor->GetBlockTime() - nPowTargetSpacing;
+        }
 
         if (params.nASERTAnchorEpochLength > 0 && pindexLast->nHeight >= anchorHeight) {
             const int epochStartHeight = anchorHeight +
@@ -217,20 +234,21 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
             anchorHeight = epochStartHeight;
             anchorBits = epochAnchor->nBits;
-            anchorParentTime = epochAnchor->GetBlockTime() - params.nPowTargetSpacing;
+            anchorParentTime = epochAnchor->GetBlockTime() - nPowTargetSpacing;
 
             // A long outage must never make the first returning block easier:
             // that block was already accepted at the old target. For following
             // blocks, cap recovery to a small deterministic number of ASERT
             // half-lives instead of counting the entire idle wall-clock gap.
             if (params.nASERTStallResetSeconds > 0 &&
-                params.nASERTMaxStallEasingHalflives > 0) {
+                params.nASERTMaxStallEasingHalflives > 0 &&
+                nNextHeight != params.nPowTargetUpgradeHeight) {
                 const CBlockIndex* cursor = pindexLast;
                 while (cursor && cursor->nHeight >= epochStartHeight) {
                     if (cursor->pprev) {
                         const int64_t gap = cursor->GetBlockTime() - cursor->pprev->GetBlockTime();
                         if (gap > params.nASERTStallResetSeconds) {
-                            const int64_t maxEffectiveGap = params.nPowTargetSpacing +
+                            const int64_t maxEffectiveGap = nPowTargetSpacing +
                                 params.nASERTMaxStallEasingHalflives *
                                     params.GetASERTHalfLife(cursor->nHeight + 1);
                             anchorHeight = cursor->nHeight;
@@ -255,7 +273,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
                 LogPrintf("5TRAT CRITICAL: launch anchor block not found at height %d\n", anchorHeight);
                 return nProofOfWorkLimit;
             }
-            anchorParentTime = pAnchor->GetBlockTime() - params.nPowTargetSpacing;
+            anchorParentTime = pAnchor->GetBlockTime() - nPowTargetSpacing;
         }
 
         // If anchorParentTime is 0, dynamically get anchor's parent block timestamp
@@ -302,14 +320,13 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         const int64_t nHeightDiff = pindexLast->nHeight - anchorHeight;
 
         // Calculate the next target using the integer ASERT formula. Production
-        // 5TRAT keeps a permanent 30-minute half-life; the transition facility
-        // remains available only to inherited test configurations.
+        // 5TRAT selects its spacing, floor and half-life by next-block height.
         arith_uint256 nextTarget = CalculateASERT(
             refTarget,
-            params.nPowTargetSpacing,
+            nPowTargetSpacing,
             nTimeDiff,
             nHeightDiff,
-            UintToArith256(params.powLimit),
+            powLimit,
             params.GetASERTHalfLife(nNextHeight)
         );
 
@@ -326,7 +343,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             // Special difficulty rule for testnet:
             // If the new block's timestamp is more than 2* 10 minutes
             // then allow mining of a min-difficulty block.
-            if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing*2)
+            if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + nPowTargetSpacing*2)
                 return nProofOfWorkLimit;
             else
             {
@@ -404,7 +421,7 @@ bool PermittedDifficultyTransition(const Consensus::Params& params, int64_t heig
             return false;
         }
 
-        if (newTarget > UintToArith256(params.powLimit)) {
+        if (newTarget > UintToArith256(params.GetPowLimit(height))) {
             return false;
         }
 

@@ -248,6 +248,19 @@ struct Params {
     /** Optional test-chain transition; NEVER_ACTIVE_HEIGHT keeps one half-life. */
     int nASERTHalfLifeTransitionHeight{NEVER_ACTIVE_HEIGHT};
 
+    /**
+     * Height-activated production proof-of-work schedule upgrade.
+     *
+     * The block at nPowTargetUpgradeHeight is the first block governed by the
+     * new spacing, floor and ASERT half-life. The previous block becomes a
+     * deterministic ASERT anchor, preserving every historical header and
+     * avoiding a target discontinuity at activation.
+     */
+    int nPowTargetUpgradeHeight{NEVER_ACTIVE_HEIGHT};
+    uint256 powLimitBeforeUpgrade;
+    int64_t nPowTargetSpacingAfterUpgrade{0};
+    int64_t nASERTHalfLifeAfterUpgrade{0};
+
     /** Default consensus block size (32MB for BCH, 1MB pre-fork) */
     uint64_t nDefaultConsensusBlockSize{1000000};
 
@@ -282,6 +295,10 @@ struct Params {
     std::chrono::seconds PowTargetSpacing() const
     {
         return std::chrono::seconds{nPowTargetSpacing};
+    }
+    std::chrono::seconds PowTargetSpacing(int height) const
+    {
+        return std::chrono::seconds{GetPowTargetSpacing(height)};
     }
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     /** The best chain should have at least this much work */
@@ -368,6 +385,25 @@ struct Params {
         return IsAxionActive(height);
     }
 
+    bool IsPowTargetUpgradeActive(int height) const {
+        return nPowTargetUpgradeHeight != NEVER_ACTIVE_HEIGHT &&
+            height >= nPowTargetUpgradeHeight;
+    }
+
+    int64_t GetPowTargetSpacing(int height) const {
+        if (IsPowTargetUpgradeActive(height) && nPowTargetSpacingAfterUpgrade > 0) {
+            return nPowTargetSpacingAfterUpgrade;
+        }
+        return nPowTargetSpacing;
+    }
+
+    const uint256& GetPowLimit(int height) const {
+        if (!IsPowTargetUpgradeActive(height) && !powLimitBeforeUpgrade.IsNull()) {
+            return powLimitBeforeUpgrade;
+        }
+        return powLimit;
+    }
+
     /** Check if Upgrade 8 (native introspection, 64-bit integers) is active */
     bool IsUpgrade8Active(int height) const {
         return height > upgrade8Height;
@@ -405,6 +441,9 @@ struct Params {
      *  transitioning to stable 2-day half-life once chain matures.
      */
     int64_t GetASERTHalfLife(int height) const {
+        if (IsPowTargetUpgradeActive(height) && nASERTHalfLifeAfterUpgrade > 0) {
+            return nASERTHalfLifeAfterUpgrade;
+        }
         if (nASERTHalfLifeTransitionHeight != NEVER_ACTIVE_HEIGHT &&
             height >= nASERTHalfLifeTransitionHeight) {
             return ASERT_HALFLIFE_2_DAYS;
