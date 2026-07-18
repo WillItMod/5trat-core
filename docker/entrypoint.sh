@@ -7,6 +7,26 @@ conf="${datadir}/fivetrat.conf"
 
 mkdir -p "${datadir}"
 
+# The application chain guard writes this marker only after detecting a
+# canonical-checkpoint mismatch or the height-279/header-ahead trap. Process it
+# before starting the daemon. Wallet material and exported backups remain in
+# place; only rebuildable node/chain state is removed.
+full_resync_request="${datadir}/.full-resync-requested"
+if [[ -f "${full_resync_request}" ]]; then
+  mkdir -p "${datadir}/wallet-transfers"
+  cp -f "${full_resync_request}" \
+    "${datadir}/wallet-transfers/chain-recovery-$(date -u +%Y%m%dT%H%M%SZ).json" \
+    2>/dev/null || true
+  find "${datadir}" -mindepth 1 -maxdepth 1 \
+    ! -name wallets \
+    ! -name wallet.dat \
+    ! -name 5tratsmack \
+    ! -name wallet-transfers \
+    ! -name relaunch-backup \
+    -exec rm -rf -- {} +
+  echo "5TRAT canonical recovery cleared rebuildable chain data; wallet material was retained." >&2
+fi
+
 # This file is generated from container environment on every start so an
 # explicitly approved external P2P address can be enabled without touching the
 # wallet or chain data volumes.

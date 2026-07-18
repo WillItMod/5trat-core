@@ -226,7 +226,15 @@ public:
         fDefaultConsistencyChecks = false;
         m_is_mockable_chain = false;
 
-        checkpointData = {{{0, consensus.hashGenesisBlock}}};
+        // Height 280 activated proof-quality jackpot settlement. During the
+        // private prototype, several nodes continued extending pre-activation
+        // coinbase rules from height 279. Pin the first canonical activation
+        // block so those header-only branches can never become candidates for
+        // block download or active-chain selection on upgraded nodes.
+        checkpointData = {{
+            {0, consensus.hashGenesisBlock},
+            {280, uint256S("0x0000000000000040db0681ab3fa0d9f539d5c4ae998baaa187c6aa4f0d70a30a")},
+        }};
 
         m_assumeutxo_data = {
             // TODO to be specified in a future patch.

@@ -4613,6 +4613,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
 
     // Check against checkpoints
     if (chainman.m_options.checkpoints_enabled) {
+        const auto& checkpoints = chainman.GetParams().Checkpoints().mapCheckpoints;
+        const auto exact_checkpoint = checkpoints.find(nHeight);
+        if (exact_checkpoint != checkpoints.end() && block.GetHash() != exact_checkpoint->second) {
+            LogPrintf("ERROR: %s: block does not match checkpoint at height %d\n", __func__, nHeight);
+            return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-checkpoint");
+        }
+
         // Don't accept any forks from the main chain prior to last checkpoint.
         // GetLastCheckpoint finds the last checkpoint in MapCheckpoints that's in our
         // BlockIndex().
@@ -4620,6 +4627,12 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         if (pcheckpoint && nHeight < pcheckpoint->nHeight) {
             LogPrintf("ERROR: %s: forked chain older than last checkpoint (height %d)\n", __func__, nHeight);
             return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-fork-prior-to-checkpoint");
+        }
+        if (pcheckpoint && nHeight > pcheckpoint->nHeight
+            && pindexPrev->GetAncestor(pcheckpoint->nHeight) != pcheckpoint) {
+            LogPrintf("ERROR: %s: block descends from the wrong checkpoint ancestor at height %d\n",
+                      __func__, pcheckpoint->nHeight);
+            return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-checkpoint-ancestor");
         }
     }
 
