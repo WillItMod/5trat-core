@@ -479,6 +479,7 @@ BOOST_AUTO_TEST_CASE(fivetrat_production_consensus_parameters)
     BOOST_CHECK(consensus.fASERTAnchorAtFirstBlockTime);
     BOOST_CHECK_EQUAL(consensus.nSubsidyHalvingInterval, 420000);
     BOOST_CHECK_EQUAL(consensus.nInitialSubsidy, 5 * COIN);
+    BOOST_CHECK_EQUAL(consensus.nJackpotActivationHeight, 280);
     BOOST_CHECK_EQUAL(GetBlockSubsidy(1, consensus), 5 * COIN);
     BOOST_CHECK_EQUAL(GetBlockSubsidy(420000, consensus), 250000000);
     BOOST_REQUIRE(consensus.asertAnchorParams.has_value());

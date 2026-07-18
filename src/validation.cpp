@@ -1826,6 +1826,51 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     return nSubsidy;
 }
 
+bool IsJackpotActive(int nHeight, const Consensus::Params& consensusParams)
+{
+    return nHeight >= consensusParams.nJackpotActivationHeight;
+}
+
+CAmount GetJackpotBaseSubsidy(int nHeight, const Consensus::Params& consensusParams)
+{
+    const CAmount scheduled{GetBlockSubsidy(nHeight, consensusParams)};
+    if (!IsJackpotActive(nHeight, consensusParams)) {
+        return scheduled;
+    }
+    return scheduled - scheduled / 20;
+}
+
+CAmount GetDelayedJackpotBonus(int nHeight, const uint256& previousBlockHash,
+                               unsigned int previousBlockBits,
+                               const Consensus::Params& consensusParams)
+{
+    // The activation block has no jackpot liability from its legacy parent.
+    if (!IsJackpotActive(nHeight, consensusParams) ||
+        nHeight <= consensusParams.nJackpotActivationHeight) {
+        return 0;
+    }
+
+    const CAmount previous_scheduled{GetBlockSubsidy(nHeight - 1, consensusParams)};
+    switch (ClassifyProofTier(previousBlockHash, previousBlockBits)) {
+    case ProofTier::GOLD:
+        return (previous_scheduled * 2) / 5;
+    case ProofTier::PINK:
+        return previous_scheduled / 10;
+    case ProofTier::BLUE:
+        return 0;
+    }
+    return 0;
+}
+
+CAmount GetJackpotBlockSubsidy(int nHeight, const uint256& previousBlockHash,
+                               unsigned int previousBlockBits,
+                               const Consensus::Params& consensusParams)
+{
+    return GetJackpotBaseSubsidy(nHeight, consensusParams) +
+           GetDelayedJackpotBonus(nHeight, previousBlockHash, previousBlockBits,
+                                  consensusParams);
+}
+
 CoinsViews::CoinsViews(DBParams db_params, CoinsViewOptions options)
     : m_dbview{std::move(db_params), std::move(options)},
       m_catcherview(&m_dbview) {}
@@ -2749,18 +2794,67 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(time_connect),
              Ticks<MillisecondsDouble>(time_connect) / num_blocks_total);
 
-    const CAmount base_subsidy{GetBlockSubsidy(pindex->nHeight, params.GetConsensus())};
+    const Consensus::Params& consensus{params.GetConsensus()};
+    const CBlockIndex* previous_index{pindex->pprev};
+    const uint256 previous_hash{previous_index ? previous_index->GetBlockHash() : uint256{}};
+    const unsigned int previous_bits{previous_index ? previous_index->nBits : 0};
+    const CAmount base_subsidy{GetJackpotBaseSubsidy(pindex->nHeight, consensus)};
+    const CAmount delayed_bonus{GetDelayedJackpotBonus(
+        pindex->nHeight, previous_hash, previous_bits, consensus)};
+    const CAmount consensus_subsidy{base_subsidy + delayed_bonus};
     const CAmount coinbase_value{block.vtx[0]->GetValueOut()};
 
-    // The complete base subsidy must be issued, but miners may divide it among
-    // multiple coinbase outputs. This permits an operator-configured upkeep
-    // contribution without changing total issuance or granting the recipient
-    // any consensus privilege.
-    if (coinbase_value < base_subsidy) {
+    // The complete immediate subsidy and any delayed proof jackpot must be
+    // issued. Miners may divide the immediate amount among multiple outputs,
+    // which preserves the optional pool-level development contribution.
+    if (coinbase_value < consensus_subsidy) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
-                             "bad-cb-base", "Coinbase outputs must contain the complete 5TRAT base subsidy");
+                             "bad-cb-base", "Coinbase outputs must contain the complete 5TRAT subsidy");
     }
-    CAmount blockReward = nFees + base_subsidy;
+
+    if (IsJackpotActive(pindex->nHeight, consensus)) {
+        if (block.vtx[0]->vout.empty() ||
+            block.vtx[0]->vout[0].nValue <= 0 ||
+            block.vtx[0]->vout[0].scriptPubKey.empty() ||
+            block.vtx[0]->vout[0].scriptPubKey.size() > 75 ||
+            block.vtx[0]->vout[0].scriptPubKey.IsUnspendable()) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                                 "bad-cb-claim", "Coinbase output zero must be a spendable jackpot claim");
+        }
+
+        if (delayed_bonus > 0) {
+            if (!previous_index) {
+                return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                                     "bad-cb-jackpot-parent", "Jackpot parent index is unavailable");
+            }
+
+            CBlock previous_block;
+            if (!m_blockman.ReadBlockFromDisk(previous_block, *previous_index) ||
+                previous_block.vtx.empty() ||
+                previous_block.vtx[0]->vout.empty()) {
+                return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                                     "bad-cb-jackpot-parent", "Jackpot parent coinbase is unavailable");
+            }
+
+            const CScript& claim_script{previous_block.vtx[0]->vout[0].scriptPubKey};
+            CAmount paid_to_claim{0};
+            for (const CTxOut& output : block.vtx[0]->vout) {
+                if (output.scriptPubKey == claim_script) {
+                    paid_to_claim += output.nValue;
+                    if (!MoneyRange(paid_to_claim)) {
+                        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                                             "bad-cb-jackpot-range");
+                    }
+                }
+            }
+            if (paid_to_claim < delayed_bonus) {
+                return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                                     "bad-cb-jackpot-payee",
+                                     "Delayed proof jackpot does not pay the parent claim script");
+            }
+        }
+    }
+    CAmount blockReward = nFees + consensus_subsidy;
     if (coinbase_value > blockReward) {
         LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", coinbase_value, blockReward);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount");

@@ -106,6 +106,16 @@ struct Params {
      * inherited regression/signet fixtures retain 50 for compatibility. */
     int64_t nInitialSubsidy{5000000000};
     /**
+     * First block using delayed proof-tier jackpot settlement.
+     *
+     * Each active block issues 95% of the scheduled subsidy immediately. A
+     * Pink parent proof adds 10% and a Gold parent proof adds 40% of the
+     * parent's scheduled subsidy to the next block, paid to the parent's
+     * coinbase output zero. This avoids making a block's own reward circular
+     * with the block hash that classifies it.
+     */
+    int nJackpotActivationHeight{NEVER_ACTIVE_HEIGHT};
+    /**
      * Hashes of blocks that
      * - are known to be consensus valid, and
      * - buried in the chain, and

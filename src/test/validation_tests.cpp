@@ -6,11 +6,13 @@
 // Tests are retained for validating historical blocks created before the fork.
 
 #include <chainparams.h>
+#include <arith_uint256.h>
 #include <consensus/amount.h>
 #include <consensus/merkle.h>
 #include <core_io.h>
 #include <hash.h>
 #include <net.h>
+#include <pow.h>
 #include <signet.h>
 #include <uint256.h>
 #include <util/chaintype.h>
@@ -67,6 +69,53 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
         BOOST_CHECK(MoneyRange(nSum));
     }
     BOOST_CHECK_EQUAL(nSum, CAmount{419999994540000});
+}
+
+BOOST_AUTO_TEST_CASE(fivetrat_delayed_jackpot_subsidy)
+{
+    Consensus::Params consensus;
+    consensus.nSubsidyHalvingInterval = 420000;
+    consensus.nInitialSubsidy = 5 * COIN;
+    consensus.nJackpotActivationHeight = 100;
+
+    constexpr uint32_t blue_bits{0x1a00ccf5};
+    arith_uint256 target;
+    target.SetCompact(blue_bits);
+
+    BOOST_CHECK(!IsJackpotActive(99, consensus));
+    BOOST_CHECK(IsJackpotActive(100, consensus));
+    BOOST_CHECK_EQUAL(GetJackpotBaseSubsidy(99, consensus), 5 * COIN);
+    BOOST_CHECK_EQUAL(GetJackpotBaseSubsidy(100, consensus), 475000000);
+
+    // The activation block never inherits a liability from its legacy parent.
+    BOOST_CHECK_EQUAL(
+        GetDelayedJackpotBonus(100, ArithToUint256(target / 12), blue_bits, consensus),
+        0);
+
+    BOOST_CHECK_EQUAL(
+        GetDelayedJackpotBonus(101, ArithToUint256(target), blue_bits, consensus),
+        0);
+    BOOST_CHECK_EQUAL(
+        GetDelayedJackpotBonus(101, ArithToUint256(target / 4), blue_bits, consensus),
+        50000000);
+    BOOST_CHECK_EQUAL(
+        GetDelayedJackpotBonus(101, ArithToUint256(target / 12), blue_bits, consensus),
+        200000000);
+    BOOST_CHECK_EQUAL(
+        GetJackpotBlockSubsidy(101, ArithToUint256(target / 4), blue_bits, consensus),
+        525000000);
+    BOOST_CHECK_EQUAL(
+        GetJackpotBlockSubsidy(101, ArithToUint256(target / 12), blue_bits, consensus),
+        675000000);
+
+    // A proof found before a halving earns the pre-halving jackpot even though
+    // it is settled alongside the next era's lower immediate subsidy.
+    BOOST_CHECK_EQUAL(
+        GetJackpotBlockSubsidy(420000, ArithToUint256(target / 12), blue_bits, consensus),
+        437500000);
+    BOOST_CHECK_EQUAL(
+        GetJackpotBlockSubsidy(420001, ArithToUint256(target / 12), blue_bits, consensus),
+        337500000);
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)

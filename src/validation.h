@@ -95,6 +95,14 @@ extern uint256 g_best_block;
 extern const std::vector<std::string> CHECKLEVEL_DOC;
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
+bool IsJackpotActive(int nHeight, const Consensus::Params& consensusParams);
+CAmount GetJackpotBaseSubsidy(int nHeight, const Consensus::Params& consensusParams);
+CAmount GetDelayedJackpotBonus(int nHeight, const uint256& previousBlockHash,
+                               unsigned int previousBlockBits,
+                               const Consensus::Params& consensusParams);
+CAmount GetJackpotBlockSubsidy(int nHeight, const uint256& previousBlockHash,
+                               unsigned int previousBlockBits,
+                               const Consensus::Params& consensusParams);
 
 bool FatalError(kernel::Notifications& notifications, BlockValidationState& state, const std::string& strMessage, const bilingual_str& userMessage = {});
 

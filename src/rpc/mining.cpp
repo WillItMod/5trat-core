@@ -629,9 +629,15 @@ static RPCHelpMan getblocktemplate()
                 {
                     {RPCResult::Type::STR_HEX, "key", "values must be in the coinbase (keys may be ignored)"},
                 }},
-                {RPCResult::Type::NUM, "coinbasevalue", "current miner base subsidy plus transaction fees (in atomic units)"},
+                {RPCResult::Type::NUM, "coinbasevalue", "complete allowed coinbase value, including delayed jackpot and transaction fees (in atomic units)"},
                 {RPCResult::Type::OBJ, "5trat", "5tratum Coin proof-quality metadata",
                 {
+                    {RPCResult::Type::BOOL, "jackpot_active", "whether delayed jackpot settlement is active for this template"},
+                    {RPCResult::Type::NUM, "jackpot_activation_height", "first delayed-jackpot block height"},
+                    {RPCResult::Type::STR, "settlement", "jackpot settlement mode"},
+                    {RPCResult::Type::NUM, "base_subsidy", "immediate subsidy for the current finder in atomic units"},
+                    {RPCResult::Type::NUM, "previous_bonus", "required delayed payment to the previous finder in atomic units"},
+                    {RPCResult::Type::STR_HEX, "previous_payout_script", "script that must receive the delayed payment, empty when none is due"},
                     {RPCResult::Type::STR, "previous_tier", "proof achievement earned by the previous block"},
                     {RPCResult::Type::STR_HEX, "blue_target", "accepted block target"},
                     {RPCResult::Type::STR_HEX, "pink_target", "four-times-stronger achievement target"},
@@ -945,11 +951,25 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
-    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->GetValueOut());
     UniValue tier_metadata(UniValue::VOBJ);
     const ProofTier previous_tier{pindexPrev->nHeight > 0
         ? ClassifyProofTier(pindexPrev->GetBlockHash(), pindexPrev->nBits)
         : ProofTier::BLUE};
+    const CAmount delayed_bonus{GetDelayedJackpotBonus(
+        nNextHeight, pindexPrev->GetBlockHash(), pindexPrev->nBits,
+        consensusParams)};
+    tier_metadata.pushKV("jackpot_active", IsJackpotActive(nNextHeight, consensusParams));
+    tier_metadata.pushKV("jackpot_activation_height", consensusParams.nJackpotActivationHeight);
+    tier_metadata.pushKV("settlement", "next-block");
+    tier_metadata.pushKV("base_subsidy",
+                         GetJackpotBaseSubsidy(nNextHeight, consensusParams));
+    tier_metadata.pushKV("previous_bonus", delayed_bonus);
+    tier_metadata.pushKV(
+        "previous_payout_script",
+        delayed_bonus > 0 && pblock->vtx[0]->vout.size() > 1
+            ? HexStr(pblock->vtx[0]->vout.back().scriptPubKey)
+            : "");
     tier_metadata.pushKV("previous_tier", ProofTierName(previous_tier));
     tier_metadata.pushKV("blue_target", GetProofTierTarget(pblock->nBits, ProofTier::BLUE).GetHex());
     tier_metadata.pushKV("pink_target", GetProofTierTarget(pblock->nBits, ProofTier::PINK).GetHex());

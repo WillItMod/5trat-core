@@ -86,6 +86,9 @@ public:
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 420000;
         consensus.nInitialSubsidy = 5 * COIN;
+        // Coordinated private-test hard fork. Nodes may install this release
+        // immediately; jackpot settlement begins only at the declared height.
+        consensus.nJackpotActivationHeight = 280;
         consensus.BIP34Height = 1;
         consensus.BIP34Hash = uint256{};
         consensus.BIP65Height = 1;

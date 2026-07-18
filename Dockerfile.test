@@ -30,6 +30,7 @@ RUN src/test/test_bitcoinII --run_test=pow_tests/fivetrat_nested_proof_tiers --l
  && src/test/test_bitcoinII --run_test=pow_tests/fivetrat_fast_blocks_raise_difficulty_quickly --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=validation_tests/block_subsidy_test --log_level=test_suite \
  && src/test/test_bitcoinII --run_test=validation_tests/subsidy_limit_test --log_level=test_suite \
+ && src/test/test_bitcoinII --run_test=validation_tests/fivetrat_delayed_jackpot_subsidy --log_level=test_suite \
  && BITCOINIID=/src/src/bitcoincashIId \
     BITCOINIICLI=/src/src/bitcoincashII-cli \
     python3 test/functional/feature_bch2_consensus.py --configfile=/src/test/config.ini

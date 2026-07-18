@@ -19,6 +19,7 @@
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
 #include <logging.h>
+#include <node/blockstorage.h>
 #include <policy/feerate.h>
 #include <policy/policy.h>
 #include <pow.h>
@@ -217,7 +218,21 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vin[0].prevout.SetNull();
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    coinbaseTx.vout[0].nValue =
+        nFees + GetJackpotBaseSubsidy(nHeight, chainparams.GetConsensus());
+    const CAmount delayed_bonus{GetDelayedJackpotBonus(
+        nHeight, pindexPrev->GetBlockHash(), pindexPrev->nBits,
+        chainparams.GetConsensus())};
+    if (delayed_bonus > 0) {
+        CBlock previous_block;
+        if (!m_chainstate.m_blockman.ReadBlockFromDisk(previous_block, *pindexPrev) ||
+            previous_block.vtx.empty() ||
+            previous_block.vtx[0]->vout.empty()) {
+            throw std::runtime_error("CreateNewBlock(): delayed jackpot parent coinbase is unavailable");
+        }
+        coinbaseTx.vout.emplace_back(
+            delayed_bonus, previous_block.vtx[0]->vout[0].scriptPubKey);
+    }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     if (!consensusParams.IsBCH2ForkActive(nHeight)) {
