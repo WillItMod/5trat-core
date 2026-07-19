@@ -1,0 +1,71 @@
+name: Multi-architecture node release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: arm64
+            platform: linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build node image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: 5trat-core:release-${{ matrix.arch }}
+          cache-from: type=gha,scope=core-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=core-${{ matrix.arch }}
+
+      - name: Smoke test architecture
+        run: docker run --rm --platform "${{ matrix.platform }}" --entrypoint /usr/local/bin/fivetratd 5trat-core:release-${{ matrix.arch }} --version
+
+      - name: Export release binaries
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "dist/5trat-core-linux-${{ matrix.arch }}"
+          container="$(docker create --platform "${{ matrix.platform }}" 5trat-core:release-${{ matrix.arch }})"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          for binary in fivetratd fivetrat-cli fivetrat-wallet; do
+            docker cp "$container:/usr/local/bin/$binary" "dist/5trat-core-linux-${{ matrix.arch }}/$binary"
+          done
+          cp COPYING README.md "dist/5trat-core-linux-${{ matrix.arch }}/"
+          tar -C dist -czf "dist/5trat-core-linux-${{ matrix.arch }}.tar.gz" "5trat-core-linux-${{ matrix.arch }}"
+          sha256sum "dist/5trat-core-linux-${{ matrix.arch }}.tar.gz" >"dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 5trat-core-linux-${{ matrix.arch }}
+          path: |
+            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz
+            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256
+          if-no-files-found: error
+
+      - name: Attach tagged release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz
+            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256

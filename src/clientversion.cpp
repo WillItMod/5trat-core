@@ -100,7 +100,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<private 5tratumOS source tree>";
+    const std::string URL_SOURCE_CODE = "https://github.com/WillItMod/5trat-core";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +
