@@ -52,7 +52,10 @@ jobs:
           done
           cp COPYING README.md "dist/5trat-core-linux-${{ matrix.arch }}/"
           tar -C dist -czf "dist/5trat-core-linux-${{ matrix.arch }}.tar.gz" "5trat-core-linux-${{ matrix.arch }}"
-          sha256sum "dist/5trat-core-linux-${{ matrix.arch }}.tar.gz" >"dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256"
+          (
+            cd dist
+            sha256sum "5trat-core-linux-${{ matrix.arch }}.tar.gz" >"5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256"
+          )
 
       - uses: actions/upload-artifact@v4
         with:
