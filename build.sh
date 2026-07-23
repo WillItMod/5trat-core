@@ -13,16 +13,15 @@ BUILD_DIR="$SCRIPT_DIR/build"
 RELEASE_DIR="$SCRIPT_DIR/release"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-# The source tree still uses inherited executable filenames internally. These
-# names are implementation details; every binary produced here is built from
-# the independent 5TRAT source and chain parameters in this repository.
-BINARIES=(
-    "bitcoincashIId"
-    "bitcoincashII-cli"
-    "bitcoincashII-tx"
-    "bitcoincashII-wallet"
-    "bitcoincashII-util"
-    "bch2-seeder"
+# The source tree still uses inherited executable filenames internally. Release
+# artifacts are renamed here so users only interact with the 5TRAT names.
+RELEASE_BINARIES=(
+    "bitcoincashIId:fivetratd"
+    "bitcoincashII-cli:fivetrat-cli"
+    "bitcoincashII-tx:fivetrat-tx"
+    "bitcoincashII-wallet:fivetrat-wallet"
+    "bitcoincashII-util:fivetrat-util"
+    "bch2-seeder:fivetrat-seeder"
 )
 
 cmd_configure() {
@@ -59,16 +58,19 @@ cmd_release() {
     echo "==> Updating release binaries..."
     mkdir -p "$RELEASE_DIR"
 
-    for bin in "${BINARIES[@]}"; do
-        if [ -f "$BUILD_DIR/src/$bin" ]; then
-            cp "$BUILD_DIR/src/$bin" "$RELEASE_DIR/"
-            strip "$RELEASE_DIR/$bin"
-            echo "    $bin"
+    for mapping in "${RELEASE_BINARIES[@]}"; do
+        source_bin="${mapping%%:*}"
+        release_bin="${mapping#*:}"
+        if [ -f "$BUILD_DIR/src/$source_bin" ]; then
+            cp "$BUILD_DIR/src/$source_bin" "$RELEASE_DIR/$release_bin"
+            strip "$RELEASE_DIR/$release_bin"
+            echo "    $release_bin"
         fi
     done
 
     echo "==> Release binaries updated in $RELEASE_DIR"
-    ls -lh "$RELEASE_DIR"/*.{d,cli,tx,wallet,util} "$RELEASE_DIR/bch2-seeder" 2>/dev/null | awk '{print "    "$9": "$5}'
+    find "$RELEASE_DIR" -maxdepth 1 -type f -name 'fivetrat*' -exec ls -lh {} + \
+        | awk '{print "    "$9": "$5}'
 }
 
 cmd_clean() {
