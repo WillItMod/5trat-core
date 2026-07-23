@@ -2,9 +2,6 @@ name: Multi-architecture node release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: write
@@ -64,11 +61,3 @@ jobs:
             dist/5trat-core-linux-${{ matrix.arch }}.tar.gz
             dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256
           if-no-files-found: error
-
-      - name: Attach tagged release assets
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz
-            dist/5trat-core-linux-${{ matrix.arch }}.tar.gz.sha256
