@@ -1,5 +1,5 @@
 #!/bin/bash
-# BCH2 Build Script
+# 5TRAT Core Build Script
 # Usage: ./build.sh [command]
 #   configure  - Run autogen.sh and configure (first time setup)
 #   build      - Incremental build (default)
@@ -13,7 +13,9 @@ BUILD_DIR="$SCRIPT_DIR/build"
 RELEASE_DIR="$SCRIPT_DIR/release"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-# Binaries to build
+# The source tree still uses inherited executable filenames internally. These
+# names are implementation details; every binary produced here is built from
+# the independent 5TRAT source and chain parameters in this repository.
 BINARIES=(
     "bitcoincashIId"
     "bitcoincashII-cli"
@@ -105,7 +107,7 @@ case "${1:-build}" in
         cmd_full "$@"
         ;;
     *)
-        echo "BCH2 Build Script"
+        echo "5TRAT Core Build Script"
         echo ""
         echo "Usage: $0 [command] [configure options]"
         echo ""
