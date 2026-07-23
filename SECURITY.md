@@ -1,20 +1,40 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Reporting a vulnerability
 
-See our website for versions of Bitcoin Core that are currently supported with
-security updates: https://bitcoincore.org/en/lifecycle/#schedule
+Do not open a public issue for a finding that could expose private keys, permit
+unauthorized spending, split consensus, crash public nodes at scale or bypass
+proof-of-work validation.
 
-## Reporting a Vulnerability
+Use either of these private routes:
 
-To report security issues send an email to security@bitcoincore.org (not for support).
+1. Open a private security advisory in the
+   [5trat-core repository](https://github.com/WillItMod/5trat-core/security/advisories/new).
+2. Email `axebench.app@gmail.com` with the subject `5TRAT Core security`.
 
-The following keys may be used to communicate sensitive information to developers:
+Include:
 
-| Name | Fingerprint |
-|------|-------------|
-| Pieter Wuille | 133E AC17 9436 F14A 5CF1  B794 860F EB80 4E66 9320 |
-| Michael Ford | E777 299F C265 DD04 7930  70EB 944D 35F9 AC3D B76A |
-| Ava Chow | 1528 1230 0785 C964 44D3  334D 1756 5732 E08E 5E41 |
+- the affected commit, release or container tag
+- architecture and operating system
+- exact reproduction steps
+- expected and observed behaviour
+- logs with wallet secrets, credentials and public IPs removed
+- your assessment of impact
 
-You can import a key by running the following command with that individual’s fingerprint: `gpg --keyserver hkps://keys.openpgp.org --recv-keys "<fingerprint>"` Ensure that you put quotes around fingerprints containing spaces.
+Please allow time to reproduce and coordinate a fix before public disclosure.
+
+## Operator rules
+
+- Expose P2P TCP 57555 only when you intend to accept public peers.
+- Keep RPC, wallet files and backup material off the public internet.
+- Use a long random RPC password.
+- Verify release checksums and container digests.
+- Keep at least one tested encrypted wallet backup offline.
+- Never paste seed phrases, private keys or wallet passwords into an issue.
+
+## Consensus changes
+
+5TRAT has no remote administrator key or checkpoint authority. A consensus
+change requires new software, deterministic tests, a documented activation rule
+and adoption by node operators. Bootstrap nodes can introduce peers but cannot
+override local validation.

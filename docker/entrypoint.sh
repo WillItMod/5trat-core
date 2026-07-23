@@ -86,12 +86,23 @@ fi
     # Local replica links and public bootstrap links use the same validated P2P
     # protocol.  Bootstrap nodes are discovery/availability aids only: every
     # header, block and transaction they send is still verified locally.
-    for peer_list in "${FIVETRAT_ADDNODES:-}" "${FIVETRAT_BOOTSTRAP_NODES:-}"; do
+    for peer_list in "${FIVETRAT_ADDNODES:-}"; do
       [[ -z "${peer_list//[[:space:]]/}" ]] && continue
       IFS=',' read -ra peers <<< "${peer_list}"
       for peer in "${peers[@]}"; do
         peer="${peer//[[:space:]]/}"
         [[ -n "${peer}" ]] && echo "addnode=${peer}"
+      done
+    done
+    # Bootstrap peers are address-fetch seeds, not permanent manual
+    # connections. This makes a fresh node request the seed's peer table and
+    # fan out across the network instead of remaining attached to one VPS.
+    for peer_list in "${FIVETRAT_BOOTSTRAP_NODES:-}"; do
+      [[ -z "${peer_list//[[:space:]]/}" ]] && continue
+      IFS=',' read -ra peers <<< "${peer_list}"
+      for peer in "${peers[@]}"; do
+        peer="${peer//[[:space:]]/}"
+        [[ -n "${peer}" ]] && echo "seednode=${peer}"
       done
     done
   } > "${conf}"

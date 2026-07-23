@@ -1,33 +1,31 @@
-# Credits
+# Credits and code lineage
 
-Bitcoin Cash II (BCH2) is built upon the work of many contributors and projects.
+5TRAT is a new blockchain with its own genesis block, network identity, peer
+network, balances and consensus schedule. It is not a fork of another project's
+live ledger.
 
-## Upstream Projects
+Its implementation stands on mature open-source work from:
 
-### BitcoinII (BC2)
-BCH2 forks from BC2 at block height 53,200. We thank the BitcoinII developers for their work on the BC2 codebase.
-- https://github.com/AyalaKaguwororth2/bitcoinII
+- [Bitcoin Core](https://github.com/bitcoin/bitcoin)
+- [Bitcoin Cash Node](https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node)
+- BitcoinII and Bitcoin Cash II contributors whose code formed part of the
+  development lineage
+- Satoshi Nakamoto's original Bitcoin design and implementation
 
-### Bitcoin Core
-The foundation of this software is Bitcoin Core, developed by the Bitcoin Core developers.
-- https://github.com/bitcoin/bitcoin
-- https://bitcoincore.org
+The source therefore retains upstream copyright notices, internal compatibility
+identifiers and historical test names. These are attribution and engineering
+lineage. They do not import another chain's blocks, balances, checkpoints,
+seeds, price or governance into 5TRAT.
 
-### Bitcoin Cash (BCH)
-BCH2 implements Bitcoin Cash consensus rules, including ASERT DAA, 32MB blocks, and CashAddr.
-- https://bitcoincash.org
-- https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node
+5TRAT-specific consensus work includes:
 
-## Original Bitcoin
-Bitcoin was created by Satoshi Nakamoto in 2009.
-- Nakamoto, S. (2008). "Bitcoin: A Peer-to-Peer Electronic Cash System"
+- the fresh genesis and address/network identity
+- the five-minute mainnet schedule
+- per-block ASERT parameters and bounded launch behaviour
+- Blue, Pink and Gold proof-quality classification
+- delayed proof-jackpot settlement
+- the 420,000-block halving schedule
+- canonical checkpoint recovery and public peer bootstrap configuration
 
-## License
-
-This software is released under the MIT License, the same license used by Bitcoin Core and BitcoinII.
-
-See COPYING for full license text.
-
-## Contributors
-
-BCH2 development is community-driven. See the git history for a full list of contributors.
+See the Git history for individual contributors and [COPYING](COPYING) for the
+MIT licence.
