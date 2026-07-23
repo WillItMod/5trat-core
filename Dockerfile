@@ -38,6 +38,7 @@ RUN apt-get update \
 COPY --from=build /src/src/bitcoincashIId /usr/local/bin/fivetratd
 COPY --from=build /src/src/bitcoincashII-cli /usr/local/bin/fivetrat-cli
 COPY --from=build /src/src/bitcoincashII-wallet /usr/local/bin/fivetrat-wallet
+COPY --from=build /src/COPYING /usr/share/licenses/5trat-core/COPYING
 COPY docker/entrypoint.sh /usr/local/bin/fivetrat-entrypoint
 
 RUN chmod 0755 /usr/local/bin/fivetrat-entrypoint

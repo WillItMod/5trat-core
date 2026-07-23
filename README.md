@@ -1,86 +1,146 @@
 # 5TRAT Core
 
-5TRAT Core is the validating node and wallet backend for 5tratSmack. It is a
-fresh SHA-256d blockchain: it does not inherit BCH, BCH2, Bitcoin history,
-balances, price, checkpoints, seeds, or chain identity. The implementation uses
-mature Bitcoin/BCH validation and wallet code under the MIT licence.
+5TRAT Core is the open-source validating node and wallet backend for the 5TRAT
+network. It is a fresh SHA-256d blockchain with its own genesis block, network
+identity, address prefix, difficulty schedule, peer network and transaction
+history.
 
-This public repository exists so node operators, integrators and reviewers can
-inspect the complete consensus implementation. The network and application
-remain prototype software; source publication is not an exchange listing,
-5tratumOS DEV-feed release or claim of monetary value.
+The complete consensus implementation is public so miners, node operators,
+wallet developers and future exchange integrators can inspect what every node
+enforces.
 
-## Main-chain parameters
+## Official links
+
+| Resource | Address |
+| --- | --- |
+| 5TRAT website | [5trat.com](https://5trat.com) |
+| 5tratumOS | [5tratum.com](https://5tratum.com) |
+| 5tratSmack app | [github.com/WillItMod/5tratSmack](https://github.com/WillItMod/5tratSmack) |
+| Public explorer 1 | [explorer1.5trat.net](https://explorer1.5trat.net/explorer/) |
+| Public explorer 2 | [explorer2.5trat.net](https://explorer2.5trat.net/explorer/) |
+| Core issues | [github.com/WillItMod/5trat-core/issues](https://github.com/WillItMod/5trat-core/issues) |
+
+## Mainnet at a glance
 
 | Parameter | Value |
 | --- | --- |
-| Currency / address prefix | 5TRAT / `5trat:` |
+| Currency | 5TRAT |
+| Address prefix | `5trat:` |
+| Atomic unit | 0.00000001 5TRAT |
 | Proof of work | SHA-256d |
-| Accepted-block target | 15 minutes through height 79; 5 minutes from height 80 |
-| Difficulty adjustment | Per-block ASERT; 30-minute half-life through height 79, 15 minutes from height 80 |
-| Launch anchor | Difficulty 20,955,132.57; about 15 minutes at 100 TH/s through height 79 |
-| Minimum difficulty | 20,955,132.57 through height 79; about 6,985,044.19 from height 80 (100 TH/s-equivalent floor at each schedule) |
-| Block subsidy | 5 5TRAT through height 279; delayed proof jackpot settlement from height 280; halving every 420,000 blocks |
-| Supply limit | Approximately 4.2 million 5TRAT plus fees |
-| P2P / RPC | TCP 57555 / TCP 57576 |
+| Target block time | 5 minutes from height 80 |
+| Difficulty | Per-block ASERT |
+| ASERT half-life | 15 minutes from height 80 |
+| Minimum difficulty | Approximately 6,985,044.19 from height 80 |
+| Initial subsidy | 5.00 5TRAT before proof-jackpot activation |
+| Proof rewards | Blue 4.75, Pink 5.25, Gold 6.75 5TRAT across the winning block and following settlement block |
+| Long-run expected issuance | 5.00 5TRAT per block before halvings |
+| Halving interval | 420,000 blocks |
+| Approximate maximum supply | 4.2 million 5TRAT plus fees |
+| P2P port | TCP 57555 |
+| RPC port | TCP 57576 in 5tratSmack; configurable for standalone nodes |
 | Genesis | `af4973599946fbe8c350eae4ff51ba9fbe3fc00fa07e8413b869874ee1be8310` |
 
-Block one always uses the compiled launch target. From block two onward, the
-ASERT clock is relative to block one's accepted timestamp, so time spent waiting
-for the first miner cannot create a low-difficulty catch-up burst.
-Every 144 blocks the node starts a new deterministic ASERT anchor. An accepted
-gap over six hours may ease the following target by at most two half-lives
-(approximately 4x), while the first returning block still has to satisfy the
-target already in force and no target may cross the permanent launch floor.
+Block one uses the compiled launch target. From block two onward, the ASERT
+clock is relative to block one's accepted timestamp. Every 144 blocks the node
+starts a deterministic ASERT epoch. A long gap can ease future work gradually,
+but the target cannot exceed the network's compiled proof-of-work limit.
 
-Blue, Pink, and Gold are nested proof-quality labels at `T`, `T/4`, and `T/12`.
-They all validate against the same chain target and never create independent
-mining lanes. From height 280, every block immediately issues 4.75 5TRAT. The
-next block settles an additional 0 for a Blue parent, 0.50 5TRAT for Pink or
-2.00 5TRAT for Gold to the parent block's output-zero claim. This avoids
-circular self-selection of a block's own reward. The probability-weighted
-expected issuance remains 5 5TRAT per block before halvings.
+## One chain, three proof qualities
 
-## Container build
+Blue, Pink and Gold are nested labels for the quality of a valid winning proof:
 
-The node builds directly from this checkout on AMD64 and ARM64:
+| Tier | Proof threshold | Reward mechanics from height 280 |
+| --- | --- | --- |
+| Blue | Network target `T` | 4.75 5TRAT immediately |
+| Pink | `T / 4` | 4.75 immediately, then 0.50 to the same claim in the next block |
+| Gold | `T / 12` | 4.75 immediately, then 2.00 to the same claim in the next block |
+
+They are not separate chains and do not have independent network difficulties.
+Every candidate must first satisfy the same network target. The delayed
+settlement prevents a miner selecting its own reward after seeing its hash.
+
+## Price and mining-cost estimates
+
+The protocol contains no GBP, EUR, USD or DGB price oracle. 5TRAT has no
+administrator-set price.
+
+The 5tratSmack trade view derives its public DGB reference only from completed
+5TRAT/DGB atomic swaps. Open offers do not move the guide. The wallet's
+electricity figure is different: it estimates what the displayed coins may have
+cost that miner to produce using their hashrate, an assumed 14 J/TH and their
+entered electricity tariff. It is a cost estimate, not a market price.
+
+## Peer discovery
+
+Mainnet builds contain two independent DNS bootstrap names:
+
+- `seed1.5trat.net`
+- `seed2.5trat.net`
+
+Seeds introduce a new node to peers. They do not provide trusted blocks,
+checkpoints or consensus decisions. Every node independently verifies every
+header, block and transaction it accepts. See [NETWORK.md](NETWORK.md) for the
+public service map and operator guidance.
+
+## Build and run
+
+The supported quick route builds a headless AMD64 or ARM64 container directly
+from this checkout:
 
 ```bash
 docker build --tag 5trat-core .
+docker volume create 5trat-core-data
+docker run -d \
+  --name 5trat-core \
+  --restart unless-stopped \
+  -e FIVETRAT_NETWORK=main \
+  -e FIVETRAT_RPC_PASSWORD='replace-with-a-long-random-secret' \
+  -p 57555:57555 \
+  -v 5trat-core-data:/data \
+  5trat-core
 ```
 
-The image exposes `fivetratd`, `fivetrat-cli`, and `fivetrat-wallet`. Runtime
-configuration is generated by `docker/entrypoint.sh`; an RPC password is
-mandatory. Tagged releases attach precompiled `linux/amd64` and `linux/arm64`
-archives containing the daemon, CLI and wallet tool. The 5tratSmack deployment
-keeps RPC private and uses a separate host-network helper for optional UPnP P2P
-mapping.
+Only P2P port 57555 should be exposed publicly. Keep RPC private. For a
+self-contained node, wallet, explorer and solo pool, install 5tratSmack through
+5tratumOS instead.
 
-## Targeted consensus tests
+More detail is in [INSTALL.md](INSTALL.md).
+
+## Tests
 
 ```bash
-docker build --tag 5trat-core-tests:private -f Dockerfile.test .
+docker build --tag 5trat-core-tests -f Dockerfile.test .
 ```
 
-That build compiles the unit-test binary and exercises the 5TRAT proof tiers,
-production consensus parameters, launch-delay handling, subsidy schedule, and
-supply bound. End-to-end node, pool, wallet, backup, restore, and transaction
-checks are run by the private deployment acceptance workflow.
+This builds the unit-test binary and exercises production parameters, proof
+tiers, launch timing, jackpot settlement, subsidy halvings and supply bounds.
+Consensus changes should include deterministic tests and an explicit activation
+rule.
 
-## Security and upgrades
+## Code lineage
 
-There is no administrator key, balance editor, price oracle, remote checkpoint,
-or consensus update channel. A consensus change requires a new reviewed binary
-and an explicit activation rule accepted by node operators. Three containers on
-one Proxmox guest test replication, but they are still one administrative and
-failure domain; they are not decentralisation.
+5TRAT has a fresh chain identity and does not inherit the balances, blocks,
+checkpoints, price or peer network of Bitcoin, Bitcoin Cash, BitcoinII, BCH2 or
+DigiByte.
 
-Do not expose RPC or wallet files. Do not treat difficulty, energy cost, or an
-app estimate as a GBP price. Before public peering or economic use, obtain an
-independent consensus review, add geographically independent nodes and miners,
-perform restore drills, and publish a versioned network-launch specification.
+The implementation was built from mature Bitcoin-family open-source code.
+Upstream copyright notices, internal compatibility identifiers and historical
+test names remain where required for attribution and maintainability. Seeing an
+upstream name in a source file does not make that project part of the 5TRAT
+network. See [CREDITS.md](CREDITS.md).
+
+## Security
+
+There is no administrator key, balance editor, remote checkpoint or hidden
+consensus control. Protocol upgrades require reviewed software with an explicit
+activation rule that node operators choose to run.
+
+Do not expose RPC or wallet files. Keep encrypted wallet backups and verify
+downloads. Report security-sensitive findings using
+[SECURITY.md](SECURITY.md), not a public issue.
 
 ## Licence
 
-The node source and inherited components are distributed under the MIT licence.
-See `COPYING` and the retained source-level attribution.
+5TRAT Core and its inherited components are distributed under the MIT licence.
+See [COPYING](COPYING) and the retained source-level attribution.
