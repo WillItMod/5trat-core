@@ -75,7 +75,8 @@ test accepts):
      a competing package or transaction with a mutated witness, even though the two
      same-txid-different-witness transactions are conflicting and cannot replace each other, the
      honest package should still be considered for acceptance.
-     (Note: After BCH2 fork, same-txid-different-witness scenarios cannot occur since witness data is disabled.)
+     (On 5TRAT, same-txid-different-witness scenarios cannot occur because
+     witness data is not part of the chain's transaction model.)
 
 ### Package Fees and Feerate
 

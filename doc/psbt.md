@@ -69,7 +69,7 @@ hardware implementations will typically implement multiple roles simultaneously.
   signatures.
 - **`utxoupdatepsbt` (Updater)** is a node RPC that takes a PSBT and updates it
   to include information available from the UTXO set (works only for SegWit
-  inputs). Note: After BCH2 fork, SegWit inputs are not valid in new transactions.
+  inputs). On 5TRAT, SegWit inputs are not valid in new transactions.
 - **`finalizepsbt` (Finalizer, Extractor)** is a utility RPC that finalizes any
   partial signatures, and if all inputs are finalized, converts the result to a
   fully signed transaction which can be broadcast with `sendrawtransaction`.
